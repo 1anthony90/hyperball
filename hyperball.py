@@ -1,9 +1,9 @@
-import pygame, sys, socket, random, math
+import pygame, sys, socket, random
 from PodSixNet.Connection import ConnectionListener, connection
-from time import sleep, time
+from time import sleep
 from pygame.locals import *
 
-#uses parts of a client created for a simple movement simulator https://github.com/thebillington/pygame_multiplayer_server
+#uses parts of a client created for a simple movement simulator: https://github.com/thebillington/pygame_multiplayer_server
 class HyperBall(ConnectionListener):
     
     #checks to see if a point is inside a rectangle, for making the obstructions and points
@@ -72,19 +72,20 @@ class HyperBall(ConnectionListener):
 
     def prepare(self):
         prepareseconds = 3
+        self.movementlock = False
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
-        countdowntext = self.font80.render("Starting in {}".format(3-round(self.count/60,1)),1,(255,0,255))
+        countdowntext = self.font80.render("Starting in {}".format(3-round(self.count/self.TICKRATE,1)),1,(255,0,255))
         countdowntextwidth = self.WIDTH/2-countdowntext.get_width()/2
         firsttime = True
-        while(self.count<prepareseconds*60):
+        while(self.count<prepareseconds*self.TICKRATE):
             connection.Pump()
             self.Pump()
             self.checkExit()
-            self.clock.tick(60)
+            self.clock.tick(self.TICKRATE)
             self.screen.fill(0)
             playernumbertext = self.font80.render("You are player {}".format(self.player+1), 1, (255,128,255))
-            countdowntext = self.font80.render("Starting in {}".format(round(prepareseconds-self.count/60,1)),1,(255,128,255))
+            countdowntext = self.font80.render("Starting in {}".format(round(prepareseconds-self.count/self.TICKRATE,1)),1,(255,128,255))
             self.draw()
             self.screen.blit(playernumbertext,(self.WIDTH/2-playernumbertext.get_width()/2,self.HEIGHT/2-playernumbertext.get_height()/2-40))
             self.screen.blit(countdowntext, (countdowntextwidth,self.HEIGHT/2-countdowntext.get_height()/2+40))
@@ -99,12 +100,17 @@ class HyperBall(ConnectionListener):
     def __init__(self, host, port):
         pygame.init()
         pygame.font.init()
+        #optimizes program by only checking certain events
+        pygame.event.set_allowed([QUIT, KEYDOWN, KEYUP])
+        self.TICKRATE = 60
         self.WIDTH = 1366
         self.HEIGHT = 768
         self.speed = 7
         self.font40 = pygame.font.SysFont("Sans", 40)
         self.font80 = pygame.font.SysFont("Sans", 80)
-        self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), FULLSCREEN)#paramater FULLSCREEN
+        #these settings get used in the creation of the screen and improve performance
+        settings = FULLSCREEN #| DOUBLEBUF | HWSURFACE
+        self.screen = pygame.display.set_mode((0,0), settings)
         pygame.display.set_caption("Hyperball")
         self.clock = pygame.time.Clock()
         self.playeronescore = 0
@@ -114,6 +120,7 @@ class HyperBall(ConnectionListener):
         self.exitnext = False
         self.alt = False
         self.gameended = False
+        self.movementlock = False
         if getattr(sys, 'frozen', False):
             locationbackslash = sys._MEIPASS + "/"
             self.location = locationbackslash.replace("\\","/")
@@ -121,10 +128,10 @@ class HyperBall(ConnectionListener):
             self.location = ""
         self.backgroundimg = pygame.image.load(self.location + "background.png").convert()
         self.background = self.backgroundimg.get_rect()
-        self.playeroneimg = pygame.image.load(self.location + "playerone.png")
+        self.playeroneimg = pygame.image.load(self.location + "playerone.png").convert_alpha()
         self.playerone = self.playeroneimg.get_rect()
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
-        self.playertwoimg = pygame.image.load(self.location + "playertwo.png")
+        self.playertwoimg = pygame.image.load(self.location + "playertwo.png").convert_alpha()
         self.playertwo = self.playertwoimg.get_rect()
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
         self.players = [self.playerone, self.playertwo]
@@ -223,7 +230,7 @@ class HyperBall(ConnectionListener):
             del self.extrapoints[self.checkMovement(self.playertwo, self.extrapoints)]
             self.playertwoscore += 3
             self.count = 0
-        if(self.playeronescore > self.TOTALSCORE/2 or self.playertwoscore > self.TOTALSCORE/2 or self.count>600 or (self.playeronescore == 30 and self.playertwoscore == 30)):
+        if(self.playeronescore > self.TOTALSCORE/2 or self.playertwoscore > self.TOTALSCORE/2 or self.count>(10*self.TICKRATE) or (self.playeronescore == 30 and self.playertwoscore == 30)):
             self.gameended = True
 
     #restarts the game        
@@ -249,6 +256,8 @@ class HyperBall(ConnectionListener):
             self.screen.blit(self.pointimg, point)
         for extrapoint in self.extrapoints:
             self.screen.blit(self.extrapointimg, extrapoint)
+        fps = self.font40.render(str(int(self.clock.get_fps())), 1, (255,255,255))
+        self.screen.blit(fps,(0,0))
         scoretextone = self.font40.render("Player One Score: {}".format(self.playeronescore), 1, (250,0,0))
         scoretexttwo = self.font40.render("Player Two Score: {}".format(self.playertwoscore), 1, (250,0,0))
         self.screen.blit(scoretextone, (self.WIDTH * 1/3 - self.scorelength/2,0))
@@ -274,7 +283,7 @@ class HyperBall(ConnectionListener):
             pygame.quit()
             sys.exit()
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == QUIT:
                 if(self.connected):
                     connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                 self.exitnext = True
@@ -306,6 +315,7 @@ class HyperBall(ConnectionListener):
         if keys[K_d]:
             self.moveRight(self.players[self.player])
         if keys[K_r] and self.count>30:
+            self.movementlock = True
             self.restart()
             obstructionpackage = self.package(self.obstructions)
             pointpackage = self.package(self.points)
@@ -319,9 +329,10 @@ class HyperBall(ConnectionListener):
         self.Pump()
         connection.Pump()
         self.checkExit()
-        self.checkKeys()
+        if(self.movementlock == False):
+            self.checkKeys()
         self.awardPoints()
-        self.clock.tick(60)
+        self.clock.tick(self.TICKRATE)
         self.screen.fill(0)
         self.draw()
         pygame.display.flip()
@@ -352,8 +363,9 @@ class HyperBall(ConnectionListener):
         elif self.player == 1:
             p = 0
         #Update the player data
-        self.players[p].x = data["x"]
-        self.players[p].y = data["y"]
+        if(self.movementlock == False):
+            self.players[p].x = data["x"]
+            self.players[p].y = data["y"]
         
     #Is called when the other player restarts        
     def Network_restart(self, data):

@@ -150,5 +150,3 @@ server = GameServer(localaddr=(ipaddress, port))
 #Pump the server at regular intervals (check for new requests)
 while True:
     server.Pump()
-    sleep(0.0001)
-
