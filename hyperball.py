@@ -72,15 +72,15 @@ class HyperBall(ConnectionListener):
 
     def prepare(self):
         prepareseconds = 3
-        self.movementlock = False
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
         countdowntext = self.font80.render("Starting in {}".format(3-round(self.count/self.TICKRATE,1)),1,(255,0,255))
         countdowntextwidth = self.WIDTH/2-countdowntext.get_width()/2
         firsttime = True
+        self.movementlock = False
         while(self.count<prepareseconds*self.TICKRATE):
-            connection.Pump()
-            self.Pump()
+            #connection.Pump()
+            #self.Pump()
             self.checkExit()
             self.clock.tick(self.TICKRATE)
             self.screen.fill(0)
@@ -148,6 +148,11 @@ class HyperBall(ConnectionListener):
         #multiplayer additions
         self.gameID = None
         self.player = None
+        self.opponentsent = False
+        self.moveingup = False
+        self.moveingdown = False
+        self.moveingleft = False
+        self.moveingright = False
         self.Connect((host,port))
         self.connected = True
         obstructionpackage = self.package(self.obstructions)
@@ -321,9 +326,27 @@ class HyperBall(ConnectionListener):
             pointpackage = self.package(self.points)
             extrapointpackage = self.package(self.extrapoints)
             connection.Send({"action":"restart","player":self.player,"gameID":self.gameID,"obstructions":obstructionpackage,"points":pointpackage,"extrapoints":extrapointpackage})     
-        if(keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d]):
-            connection.Send({"action":"update","x":self.players[self.player].x,"y":self.players[self.player].y,"player":self.player,"gameID":self.gameID})
-        
+        #if(keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d]):
+        #must send every loop so the other client can tell whether information was missed
+        connection.Send({"action":"update","x":self.players[self.player].x,"y":self.players[self.player].y,"player":self.player,"gameID":self.gameID})
+        if self.player == 0:
+            p = 1
+        elif self.player == 1:
+            p = 0
+        #if the client did not recieve any sent data from the other client, then extrapolate
+        if (self.opponentsent == False):
+            if self.moveingup:
+                self.moveUp(self.players[p])
+            elif self.moveingdown:
+                self.moveDown(self.players[p])
+            if self.moveingleft:
+                self.moveLeft(self.players[p])
+            elif self.moveingright:
+                self.moveRight(self.players[p])
+        #has to set opponentsent to False so that on the next loop this client must recieve an update or else it will move the player through extrapolation
+        else:
+            self.opponentsent = False
+            
     #update function runs the game, calls all of the neccesary methods
     def update(self):
         self.Pump()
@@ -362,11 +385,32 @@ class HyperBall(ConnectionListener):
             p = 1
         elif self.player == 1:
             p = 0
-        #Update the player data
+        #Update the player data and what direction the player last moved in
         if(self.movementlock == False):
+            self.opponentsent = True
+            oldx = self.players[p].x
+            oldy = self.players[p].y
             self.players[p].x = data["x"]
             self.players[p].y = data["y"]
-        
+            if(oldx > self.players[p].x):
+                self.moveingleft = True
+            elif(oldx < self.players[p].x):
+                self.moveingright = True
+                self.moveingleft = False
+            else:
+                self.moveingleft = None
+                self.moveingright = None
+            if(oldy > self.players[p].y):
+                self.moveingup = True
+            elif(oldy < self.players[p].y):
+                self.moveingdown = True
+                self.moveingup = False
+            else:
+                self.moveingup = False
+                self.moveingdown = False
+                self.moveingleft = False
+                self.moveingright = False         
+
     #Is called when the other player restarts        
     def Network_restart(self, data):
         self.restart()
