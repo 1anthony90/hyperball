@@ -53,7 +53,7 @@ class HyperBall():
         pygame.font.init()
         self.WIDTH = 1366
         self.HEIGHT = 768
-        self.SPEED = 5
+        self.speed = 7
         self.font40 = pygame.font.SysFont(None, 40)
         self.font80 = pygame.font.SysFont(None, 80)
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), FULLSCREEN)
@@ -95,37 +95,37 @@ class HyperBall():
 
     #moves the passed in player up
     def moveUp(self, player):
-        if(player.top < self.SPEED):
+        if(player.top < self.speed):
             player.top = 0
         else:
-            player.top -= self.SPEED
+            player.top -= self.speed
             while(self.checkMovement(player, self.obstructions) != -1):
                 player.top += 1
 
     #moves the passed in player down
     def moveDown(self, player):
-        if(player.bottom > self.HEIGHT-self.SPEED):
+        if(player.bottom > self.HEIGHT-self.speed):
             player.bottom = self.HEIGHT
         else:
-            player.top += self.SPEED
+            player.top += self.speed
             while(self.checkMovement(player, self.obstructions) != -1):
                 player.top -= 1
 
     #moves the passed in player left
     def moveLeft(self, player):
-        if(player.left < self.SPEED):
+        if(player.left < self.speed):
             player.left = 0
         else:
-            player.left -= self.SPEED
+            player.left -= self.speed
             while(self.checkMovement(player, self.obstructions) != -1):
                 player.left += 1
                 
     #moves the passed in player right
     def moveRight(self, player):
-        if(player.right > self.WIDTH-self.SPEED):
+        if(player.right > self.WIDTH-self.speed):
             player.right = self.WIDTH
         else:
-            player.left += self.SPEED
+            player.left += self.speed
             while(self.checkMovement(player, self.obstructions) != -1):
                 player.left -= 1
 
@@ -207,8 +207,11 @@ class HyperBall():
 
     #checks which keys are pressed and calls movement and restart methods
     def checkKeys(self):
+        self.speed = 7
         #Get the keys that are being pressed
         keys = pygame.key.get_pressed()
+        if((keys[K_w] or keys[K_s]) and (keys[K_a] or keys[K_d])):
+            self.speed = 5
         #Check which keys were pressed, update the position and notify the server of the update
         if keys[K_w]:
             self.moveUp(self.playerone)
