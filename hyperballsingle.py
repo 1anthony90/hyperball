@@ -243,6 +243,8 @@ class HyperBall():
         pygame.display.flip()
         self.count += 1
 #game instantiation and loop
-hyper = HyperBall()
-while True:
-    hyper.update()
+if __name__ == "__main__":
+   # runs if it isn't ran from import
+    hyper = HyperBall()
+    while True:
+        hyper.update()
