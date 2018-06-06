@@ -80,8 +80,8 @@ class HyperBall(ConnectionListener):
         firsttime = True
         self.movementlock = True
         while(self.count<prepareseconds*self.TICKRATE):
-            #connection.Pump()
-            #self.Pump()
+            connection.Pump()
+            self.Pump()
             self.checkExit()
             self.clock.tick(self.TICKRATE)
             self.screen.fill(0)
