@@ -1,14 +1,17 @@
 import pygame, sys, random, math
 from pygame.locals import *
+
 class HyperBall():
+
     #checks to see if a point is inside a rectangle, for making the obstructions and points
-    def isPointInsideRect(self, x, y, rect): #from pygame ch. 18
+    def isPointInsideRect(self, x, y, rect):  # from pygame ch. 18
         if (x > rect.left) and (x < rect.right) and (y > rect.top) and (y < rect.bottom):
             return True
         else:
             return False
-    #determines if two rectangles are overlapping
-    def doRecsOverlap(self, rec1, rec2): #from pygame ch. 18
+
+    # determines if two rectangles are overlapping
+    def doRecsOverlap(self, rec1, rec2):  # from pygame ch. 18
         for a, b in [(rec1, rec2), (rec2, rec1)]:
             # Check if a's corners are inside b
             if ((self.isPointInsideRect(a.left, a.top, b)) or
@@ -17,13 +20,13 @@ class HyperBall():
                 (self.isPointInsideRect(a.right, a.bottom, b))):
                 return True
         return False
+
     #code for generating the 50 obstructions
     def createObstructions(self, amount):
         obstructions = []
-        obstructionimg = pygame.image.load("obstruction.png")
         while(len(obstructions)<amount):
             append = True
-            tempobstruction = obstructionimg.get_rect()
+            tempobstruction = self.obstructionimg.get_rect()
             tempobstruction.topleft =(random.randint(0,self.WIDTH-tempobstruction.width),random.randint(0,self.HEIGHT-tempobstruction.height))
             for a in [self.playerone, self.playertwo]:
                 if(tempobstruction.right >= (a.left-a.width) and tempobstruction.left <= (a.right+a.width)
@@ -34,7 +37,7 @@ class HyperBall():
         return obstructions
     #general method to create non-overlapping sprites
     def createRecs(self, name, amount, allrectangles):
-        sampleactorimg = pygame.image.load(name + ".png")
+        sampleactorimg = pygame.image.load(self.location + name + ".png")
         newrecs = []
         while(len(newrecs)<amount):
             append = True
@@ -54,8 +57,8 @@ class HyperBall():
         self.WIDTH = 1366
         self.HEIGHT = 768
         self.speed = 7
-        self.font40 = pygame.font.SysFont(None, 40)
-        self.font80 = pygame.font.SysFont(None, 80)
+        self.font40 = pygame.font.SysFont("Sans", 40)
+        self.font80 = pygame.font.SysFont("Sans", 80)
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), FULLSCREEN)
         pygame.display.set_caption("Hyperball")
         self.clock = pygame.time.Clock()
@@ -64,20 +67,25 @@ class HyperBall():
         self.count = 0
         self.alt = False
         self.gameended = False
-        self.backgroundimg = pygame.image.load("background.png").convert()
+        if hasattr(sys, '_MEIPASS'):
+            locationbackslash = sys._MEIPASS + "/"
+            self.location = locationbackslash.replace("\\","/")
+        else:
+            self.location = ""
+        self.backgroundimg = pygame.image.load(self.location + "background.png").convert()
         self.background = self.backgroundimg.get_rect()
-        self.playeroneimg = pygame.image.load("playerone.png")
+        self.playeroneimg = pygame.image.load(self.location + "playerone.png")
         self.playerone = self.playeroneimg.get_rect()
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
-        self.playertwoimg = pygame.image.load("playertwo.png")
+        self.playertwoimg = pygame.image.load(self.location + "playertwo.png")
         self.playertwo = self.playertwoimg.get_rect()
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
         self.players = [self.playerone, self.playertwo]
-        self.obstructionimg = pygame.image.load("obstruction.png").convert()
+        self.obstructionimg = pygame.image.load(self.location + "obstruction.png").convert()
         self.obstructions = self.createObstructions(50)
-        self.pointimg = pygame.image.load("point.png").convert()
+        self.pointimg = pygame.image.load(self.location + "point.png").convert()
         self.points = self.createRecs("point", 42, [self.players, self.obstructions])
-        self.extrapointimg = pygame.image.load("extrapoint.png").convert()
+        self.extrapointimg = pygame.image.load(self.location + "extrapoint.png").convert()
         self.extrapoints = self.createRecs("extrapoint", 6, [self.players, self.obstructions, self.points])
         self.TOTALSCORE = len(self.points) + len(self.extrapoints) * 3
         pygame.mouse.set_visible(False)
@@ -88,7 +96,7 @@ class HyperBall():
     def checkMovement(self, player, recs):    
         i = 0
         for a in recs:
-            if(self.doRecsOverlap(player, a)):  
+            if(self.doRecsOverlap(player, a)):
                 return i
             i += 1
         return -1

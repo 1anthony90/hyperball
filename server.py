@@ -1,4 +1,6 @@
 #is an adapted server from a simple movement simulator https://github.com/thebillington/pygame_multiplayer_server
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import socket
 from PodSixNet.Channel import Channel

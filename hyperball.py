@@ -121,11 +121,11 @@ class HyperBall(ConnectionListener):
         self.alt = False
         self.gameended = False
         self.movementlock = False
-        if getattr(sys, 'frozen', False):
-            locationbackslash = sys._MEIPASS + "/"
-            self.location = locationbackslash.replace("\\","/")
-        else:
-            self.location = ""
+        #if getattr(sys, 'frozen', False):
+         #   locationbackslash = sys._MEIPASS + "/"
+          #  self.location = locationbackslash.replace("\\","/")
+        #else:
+        self.location = ""
         self.backgroundimg = pygame.image.load(self.location + "background.png").convert()
         self.background = self.backgroundimg.get_rect()
         self.playeroneimg = pygame.image.load(self.location + "playerone.png").convert_alpha()

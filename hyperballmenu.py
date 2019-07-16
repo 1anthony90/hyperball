@@ -1,3 +1,5 @@
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame, sys, socket, random, hyperballsingle
 from PodSixNet.Connection import ConnectionListener, connection
 from time import sleep
@@ -27,10 +29,9 @@ class HyperBall(ConnectionListener):
     #code for generating the 50 obstructions
     def createObstructions(self, amount):
         obstructions = []
-        obstructionimg = pygame.image.load(self.location + "obstruction.png")
         while(len(obstructions)<amount):
             append = True
-            tempobstruction = obstructionimg.get_rect()
+            tempobstruction = self.obstructionimg.get_rect()
             tempobstruction.topleft =(random.randint(0,self.WIDTH-tempobstruction.width),random.randint(0,self.HEIGHT-tempobstruction.height))
             for a in [self.playerone, self.playertwo]:
                 if(tempobstruction.right >= (a.left-a.width) and tempobstruction.left <= (a.right+a.width)
@@ -112,7 +113,7 @@ class HyperBall(ConnectionListener):
         self.font80 = pygame.font.SysFont("Sans", 80)
         #these settings get used in the creation of the screen and improve performance
         settings = FULLSCREEN | NOFRAME #| DOUBLEBUF | HWSURFACE
-        self.screen = pygame.display.set_mode((0,0), settings)
+        self.screen = pygame.display.set_mode((self.WIDTH,self.HEIGHT), settings)
         pygame.display.set_caption("Hyperball")
         self.clock = pygame.time.Clock()
         self.singleplayer = False
@@ -128,7 +129,7 @@ class HyperBall(ConnectionListener):
         self.alt = False
         self.gameended = False
         self.movementlock = False
-        if getattr(sys, 'frozen', False):
+        if hasattr(sys, '_MEIPASS'):
             locationbackslash = sys._MEIPASS + "/"
             self.location = locationbackslash.replace("\\","/")
         else:
@@ -423,7 +424,7 @@ class HyperBall(ConnectionListener):
             self.count += 1
         elif self.singleplayer:
             self.spgame.update()
-            if(pygame.key.get_pressed()[K_ESCAPE]):
+            if pygame.key.get_pressed()[K_ESCAPE]:
                 self.singleplayer = False
 
     #Create a function to receive the start game signal
