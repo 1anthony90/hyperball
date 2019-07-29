@@ -1,3 +1,5 @@
 pyi-makespec -F hyperballmenu.py
 pyinstaller hyperballmenu.spec
 ("menu.png","."),("background.png","."),("point.png","."),("extrapoint.png","."),("playerone.png","."),("playertwo.png","."),("obstruction.png","."),("selector.png",".")
+pyinstaller -F -w --add-data="menu.png;." --add-data="background.png;." --add-data="point.png;." --add-data="extrapoint.png;." --add-data="playerone.png;." --add-data="playertwo.png;." --add-data="obstruction.png;." --add-data="selector.png;." hyperballmenu.py
+Or that

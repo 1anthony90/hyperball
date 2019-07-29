@@ -1,6 +1,6 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame, sys, socket, random, hyperballsingle
+import pygame, sys, socket, random, pyperclip, hyperballsingle
 from PodSixNet.Connection import ConnectionListener, connection
 from time import sleep
 from pygame.locals import *
@@ -105,10 +105,12 @@ class HyperBall(ConnectionListener):
         pygame.font.init()
         #optimizes program by only checking certain events
         pygame.event.set_allowed([QUIT, KEYDOWN, KEYUP])
+        pygame.key.set_repeat(500,50)
         self.TICKRATE = 60
         self.WIDTH = 1366
         self.HEIGHT = 768
         self.speed = 7
+        self.font30 = pygame.font.SysFont("Sans", 30)
         self.font40 = pygame.font.SysFont("Sans", 40)
         self.font80 = pygame.font.SysFont("Sans", 80)
         #these settings get used in the creation of the screen and improve performance
@@ -116,8 +118,8 @@ class HyperBall(ConnectionListener):
         self.screen = pygame.display.set_mode((self.WIDTH,self.HEIGHT), settings)
         pygame.display.set_caption("Hyperball")
         self.clock = pygame.time.Clock()
-        self.singleplayer = False
-        self.multiplayer = False
+        self.gamestate = "mainmenu"
+        self.address = ""
         self.selected = 0
         self.playeronescore = 0
         self.playertwoscore = 0
@@ -127,6 +129,7 @@ class HyperBall(ConnectionListener):
         self.exitnext = False
         self.escapenext = False
         self.alt = False
+        self.ctrl = False
         self.gameended = False
         self.movementlock = False
         if hasattr(sys, '_MEIPASS'):
@@ -139,6 +142,8 @@ class HyperBall(ConnectionListener):
         self.menu1.center = (self.WIDTH/2, self.HEIGHT/2-self.menu1.height)
         self.menu2 = self.menuimg.get_rect()
         self.menu2.center = (self.WIDTH/2, self.HEIGHT/2+self.menu2.height)
+        self.menu3 = self.menuimg.get_rect()
+        self.menu3.center = (self.WIDTH/2, self.HEIGHT/2)
         self.selectorimg = pygame.image.load(self.location + "selector.png")
         self.selector = self.selectorimg.get_rect()
         self.selector.center = (self.WIDTH/2, self.HEIGHT/2+self.menu1.height/2)
@@ -179,7 +184,7 @@ class HyperBall(ConnectionListener):
         connection.Send({"action":"board","obstructions":obstructionpackage,"points":pointpackage,"extrapoints":extrapointpackage})
         self.running = False
         waitingtext = self.font40.render("Waiting for another player to connect...", 1, (0,255,255))
-        self.screen.blit(waitingtext,(self.WIDTH/2-waitingtext.get_width()/2,self.HEIGHT/2-waitingtext.get_height()/2))
+        self.screen.blit(waitingtext,(self.WIDTH/2-waitingtext.get_width()/2,self.HEIGHT/4-waitingtext.get_height()/2))
         pygame.display.flip()
         while (not self.running):
             self.checkExit()
@@ -310,7 +315,15 @@ class HyperBall(ConnectionListener):
             self.screen.blit(self.selectorimg,(self.WIDTH/2-self.selector.width/2,self.menu1.y-10))
         elif self.selected % 2 == 1:
             self.screen.blit(self.selectorimg,(self.WIDTH/2-self.selector.width/2,self.menu2.y-10))
-                         
+
+    def multiplayerMenuDraw(self):
+        self.screen.blit(self.backgroundimg, self.background)
+        self.screen.blit(self.menuimg, self.menu3)
+        addressprompt = self.font30.render("IP Address:",1,(255,255,255))
+        addresstext = self.font40.render(self.address,1,(255,0,0))
+        self.screen.blit(addressprompt,(self.menu3.left+10,self.menu3.top+10))
+        self.screen.blit(addresstext,(self.WIDTH/2-addresstext.get_width()/2,self.menu3.centery-addresstext.get_height()/2))
+        
     #exits on alt-f4 and on close
     def checkExit(self):
         #Check if the user exited
@@ -318,7 +331,7 @@ class HyperBall(ConnectionListener):
             pygame.quit()
             sys.exit()
         if self.escapenext:
-            self.multiplayer = False
+            self.gamestate = "mainmenu"
         for event in pygame.event.get():
             if event.type == QUIT:
                 if(self.connected):
@@ -393,16 +406,50 @@ class HyperBall(ConnectionListener):
             self.inhibitor = self.count
         if keys[K_RETURN]:
             if self.selected % 2 == 0:
-                self.multiplayer = True
-                self.initMultiplayer(address, 31425)
+                self.gamestate = "multiplayermenu"
+                #self.initMultiplayer(address, 31425)
             elif self.selected % 2 == 1:
                 self.selected = 0
                 self.spgame = hyperballsingle.HyperBall()
-                self.singleplayer = True
+                self.gamestate = "singleplayer"
                 
+    def getInput(self):
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == KEYDOWN:
+                if event.key == K_LALT:
+                    self.alt = True
+                elif event.key == K_LCTRL or event.key == K_RCTRL:
+                    self.ctrl = True
+                elif event.key == K_F4 and self.alt:
+                    pygame.quit()
+                    sys.exit()
+                elif event.key == K_v and self.ctrl:
+                    self.address += pyperclip.paste()
+                    self.address = self.address[:15]
+                elif event.key == K_ESCAPE:
+                    self.gamestate = "mainmenu"
+                elif event.key == K_RETURN:
+                    self.initMultiplayer(self.address, 31425)
+                    self.gamestate = "multiplayer"
+                elif event.key == K_BACKSPACE:
+                    self.address = self.address[:-1]
+                    self.count = 0
+                else:
+                    self.address += event.unicode
+                    self.address = self.address[:15]
+            elif event.type == KEYUP:
+                if event.key == K_LALT:
+                    self.alt = False
+                if event.key == K_LCTRL or event.key == K_RCTRL:
+                    self.ctrl = False
+
+                    
     #update function runs the game, calls all of the neccesary methods
     def update(self):
-        if not(self.multiplayer or self.singleplayer):
+        if self.gamestate == "mainmenu":
             self.checkExit()
             self.menuCheckKeys()
             self.clock.tick(self.TICKRATE)
@@ -410,7 +457,13 @@ class HyperBall(ConnectionListener):
             self.menuDraw()
             pygame.display.flip()
             self.count += 1
-        elif self.multiplayer:
+        elif self.gamestate == "multiplayermenu":
+            self.getInput()
+            self.clock.tick(self.TICKRATE)
+            self.screen.fill(0)
+            self.multiplayerMenuDraw()
+            pygame.display.flip()
+        elif self.gamestate == "multiplayer":
             self.Pump()
             connection.Pump()
             self.checkExit()
@@ -422,10 +475,10 @@ class HyperBall(ConnectionListener):
             self.draw()
             pygame.display.flip()
             self.count += 1
-        elif self.singleplayer:
+        elif self.gamestate == "singleplayer":
             self.spgame.update()
             if pygame.key.get_pressed()[K_ESCAPE]:
-                self.singleplayer = False
+                self.gamestate = "mainmenu"
 
     #Create a function to receive the start game signal
     def Network_initGame(self, data):
@@ -449,7 +502,8 @@ class HyperBall(ConnectionListener):
         #Get the non-client player
         if self.player == 0:
             p = 1
-        elif self.player == 1:
+        #elif self.player == 1:
+        else:
             p = 0
         #Update the player data and what direction the player last moved in
         if(self.movementlock == False):
@@ -494,9 +548,9 @@ class HyperBall(ConnectionListener):
         
 #game instantiation and loop
 #hyper = HyperBall("localhost", 1337)
-address = input("Address of the server: ")
-if len(address) == 0:
-    address = socket.gethostbyname(socket.gethostname())
+#address = input("Address of the server: ")
+#if len(address) == 0:
+#    address = socket.gethostbyname(socket.gethostname())
 hyper = HyperBall()
 while True:
     hyper.update()
