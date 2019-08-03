@@ -64,7 +64,8 @@ class GameServer(Server):
             #Add a new game to the queue
             channel.gameID = self.gameIndex
             self.queue = Game(channel, self.gameIndex)
-
+            self.queue.player_channels[0].Send({"action":"firstConnection"})
+            
         else:
 
             #Set the game index for the currently connected channel
