@@ -1,7 +1,7 @@
 #is an adapted server from a simple movement simulator https://github.com/thebillington/pygame_multiplayer_server
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame
+#import pygame
 import socket
 from PodSixNet.Channel import Channel
 from PodSixNet.Server import Server
@@ -64,7 +64,9 @@ class GameServer(Server):
             #Add a new game to the queue
             channel.gameID = self.gameIndex
             self.queue = Game(channel, self.gameIndex)
-            self.queue.player_channels[0].Send({"action":"firstConnection"})
+            #Add the game to the end of the game list
+            self.games.append(self.queue)
+            self.queue.player_channels[0].Send({"action":"firstConnection","gameID":self.queue.gameID,"player":0})
             
         else:
 
@@ -75,11 +77,10 @@ class GameServer(Server):
             self.queue.player_channels.append(channel)
 
             #Send a message to the clients that the game is starting
-            for i in range(0, len(self.queue.player_channels)):
-                self.queue.player_channels[i].Send({"action":"initGame","player":i,"gameID":self.queue.gameID,"obstructions":self.obstructions,"points":self.points,"extrapoints":self.extrapoints})
-
-            #Add the game to the end of the game list
-            self.games.append(self.queue)
+            print("about to send")
+            for i in range(1, len(self.queue.player_channels)):
+                print("sending")
+                self.queue.player_channels[i].Send({"action":"secondConnection","gameID":self.queue.gameID,"player":i,"obstructions":self.obstructions,"points":self.points,"extrapoints":self.extrapoints})
 
             #Empty the queue ready for the next connection
             self.queue = None
@@ -111,6 +112,7 @@ class GameServer(Server):
         self.extrapoints = extrapoints
 
     def sendStart(self, gameID):
+        print("sending start " + str(gameID))
         g = self.games[gameID]
         for i in range(0, len(g.player_channels)):
             g.player_channels[i].Send({"action":"start"})
@@ -122,13 +124,17 @@ class GameServer(Server):
     def sendExit(self, player, gameID):
         #Get the game
         g = self.games[gameID]
-		
-	#For all the other players send a message to update their position
-        for i in range(0, len(g.player_channels)):		
-	    #If we aren't looking at the player that moved
-            if i != player:		
-		#Send an exited method
-                g.player_channels[i].Send({"action":"exit"})
+        #If a player disconnects being the only person connected to that game, remove the game and reset
+        if len(g.player_channels) == 1	:
+            self.games.pop()
+            self.queue = None
+        else:
+            #Otherwise for all the other players send a message to exit
+            for i in range(0, len(g.player_channels)):		
+                #If we aren't looking at the player that moved
+                if i != player:		
+                    #Send an exited method
+                    g.player_channels[i].Send({"action":"exit"})
         
 #Create the game class to hold information about any particular game
 class Game(object):
@@ -146,7 +152,7 @@ class Game(object):
 ipaddress = socket.gethostbyname(socket.gethostname())
 port = 31425
 print("Server starting on {}".format(ipaddress))
-pygame.init()
+#pygame.init()
 #Create a server
 #server = GameServer(localaddr=("localhost", 1337))
 server = GameServer(localaddr=(ipaddress, port))

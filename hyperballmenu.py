@@ -76,8 +76,6 @@ class HyperBall(ConnectionListener):
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
         self.count = 0
-        countdowntext = self.font80.render("Starting in {}".format(3-round(self.count/self.TICKRATE,1)),1,(255,0,255))
-        countdowntextwidth = self.WIDTH/2-countdowntext.get_width()/2
         firsttime = True
         self.movementlock = True
         while(self.count<prepareseconds*self.TICKRATE):
@@ -90,7 +88,7 @@ class HyperBall(ConnectionListener):
             countdowntext = self.font80.render("Starting in {}".format(round(prepareseconds-self.count/self.TICKRATE,1)),1,(255,128,255))
             self.draw()
             self.screen.blit(playernumbertext,(self.WIDTH/2-playernumbertext.get_width()/2,self.HEIGHT/2-playernumbertext.get_height()/2-40))
-            self.screen.blit(countdowntext, (countdowntextwidth,self.HEIGHT/2-countdowntext.get_height()/2+40))
+            self.screen.blit(countdowntext, (self.WIDTH/2-countdowntext.get_width()/2,self.HEIGHT/2-countdowntext.get_height()/2+40))
             pygame.display.flip()
             if firsttime:
                 sleep(.5)
@@ -333,20 +331,21 @@ class HyperBall(ConnectionListener):
         if self.escapenext:
             self.escapenext=False
             self.gamestate = "mainmenu"
+            self.connectionstate = ""
         for event in pygame.event.get():
             if event.type == QUIT:
-                if(connection.isConnected):
+                if(self.connectionstate == "connected"):
                     connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                 self.exitnext = True
             if event.type == KEYDOWN:
-                if event.key == K_LALT:
+                if event.key == K_LALT or event.key == K_RALT:
                     self.alt = True
                 if event.key == K_F4 and self.alt:
-                    if(connection.isConnected):
+                    if(self.connectionstate == "connected"):
                         connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                     self.exitnext = True
                 if event.key == K_ESCAPE:
-                    if(connection.isConnected):
+                    if(self.connectionstate == "connected"):
                         connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                     self.escapenext = True
             if event.type == KEYUP:
@@ -415,31 +414,36 @@ class HyperBall(ConnectionListener):
                 self.gamestate = "singleplayer"
                 
     def getInput(self):
+        if self.exitnext:
+            pygame.quit()
+            sys.exit()
         for event in pygame.event.get():
             if event.type == QUIT:
-                pygame.quit()
-                sys.exit()
+                if(self.connectionstate == "connected"):
+                    connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
+                self.exitnext = True
             elif event.type == KEYDOWN:
-                if event.key == K_LALT:
+                if event.key == K_LALT or event.key == K_RALT:
                     self.alt = True
                 elif event.key == K_LCTRL or event.key == K_RCTRL:
                     self.ctrl = True
                 elif event.key == K_F4 and self.alt:
-                    pygame.quit()
-                    sys.exit()
+                    if(self.connectionstate == "connected"):
+                        connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
+                    self.exitnext = True
                 elif event.key == K_v and self.ctrl:
                     self.address += pyperclip.paste()
                     self.address = self.address[:15]
                 elif event.key == K_ESCAPE:
                     self.gamestate = "mainmenu"
                 elif event.key == K_RETURN:
-                    if self.address:
+                    if self.address and self.connectionstate != "connecting" and self.connectionstate != "connected":
                         self.connectionstate = "connecting"
                         self.screen.fill(0)
                         self.multiplayerMenuDraw()
                         pygame.display.flip()
                         self.initMultiplayer(self.address, 31425)
-                    else:
+                    elif not self.address and self.connectionstate!="connected":
                         self.connectionstate = "empty"
                 elif event.key == K_BACKSPACE:
                     self.address = self.address[:-1]
@@ -498,6 +502,8 @@ class HyperBall(ConnectionListener):
         
     #generate points and obstructions and send the data to the server            
     def Network_firstConnection(self, data):
+        self.gameID = data["gameID"]
+        self.player = data["player"]
         self.obstructions = self.createObstructions(50)
         self.points = self.createRecs("point", 42, [self.players, self.obstructions])
         self.extrapoints = self.createRecs("extrapoint", 6, [self.players, self.obstructions, self.points])
@@ -508,23 +514,23 @@ class HyperBall(ConnectionListener):
         connection.Send({"action":"board","obstructions":obstructionpackage,"points":pointpackage,"extrapoints":extrapointpackage})
 
     #Create a function to receive the start game signal
-    def Network_initGame(self, data):
+    def Network_secondConnection(self, data):
         #Get the game ID and player number from the data
+        #Set the second player's board equal to the first
         self.gameID = data["gameID"]
         self.player = data["player"]
-        #Set the second player's board equal to the first
-        if(self.player == 1):
-            self.obstructions = self.unpackage(data["obstructions"])
-            self.points = self.unpackage(data["points"])
-            self.extrapoints = self.unpackage(data["extrapoints"])
-            self.TOTALSCORE = len(self.points) + len(self.extrapoints) * 3
-            connection.Send({"action":"start","gameID":self.gameID})
-        
+        self.obstructions = self.unpackage(data["obstructions"])
+        self.points = self.unpackage(data["points"])
+        self.extrapoints = self.unpackage(data["extrapoints"])
+        self.TOTALSCORE = len(self.points) + len(self.extrapoints) * 3
+        connection.Send({"action":"start","gameID":self.gameID})
+
+    #start game signal sent to both players    
     def Network_start(self, data):
         #Sets the games to start at the same time
         self.running = True
         self.gamestate = "multiplayer"
-        pygame.display.set_caption("Hyperball Game {} Player {}".format(self.gameID, self.player+1))
+        pygame.display.set_caption("Hyperball Game {} Player {}".format(self.gameID+1, self.player+1))
         self.prepare()
         
     #Create a function to update a player based on a message from the server
