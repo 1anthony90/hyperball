@@ -77,9 +77,7 @@ class GameServer(Server):
             self.queue.player_channels.append(channel)
 
             #Send a message to the clients that the game is starting
-            print("about to send")
             for i in range(1, len(self.queue.player_channels)):
-                print("sending")
                 self.queue.player_channels[i].Send({"action":"secondConnection","gameID":self.queue.gameID,"player":i,"obstructions":self.obstructions,"points":self.points,"extrapoints":self.extrapoints})
 
             #Empty the queue ready for the next connection
@@ -112,7 +110,6 @@ class GameServer(Server):
         self.extrapoints = extrapoints
 
     def sendStart(self, gameID):
-        print("sending start " + str(gameID))
         g = self.games[gameID]
         for i in range(0, len(g.player_channels)):
             g.player_channels[i].Send({"action":"start"})

@@ -35,6 +35,7 @@ class HyperBall():
             if(append):
                 obstructions.append(tempobstruction)
         return obstructions
+    
     #general method to create non-overlapping sprites
     def createRecs(self, name, amount, allrectangles):
         sampleactorimg = pygame.image.load(self.location + name + ".png")
@@ -50,6 +51,7 @@ class HyperBall():
             if(append): 
                 newrecs.append(temprec)
         return newrecs
+    
     #automatically runs when the class is instantiated, sets up the entire game
     def __init__(self):
         pygame.init()
@@ -57,8 +59,8 @@ class HyperBall():
         self.WIDTH = 1366
         self.HEIGHT = 768
         self.speed = 7
-        self.font40 = pygame.font.SysFont("Sans", 40)
-        self.font80 = pygame.font.SysFont("Sans", 80)
+        self.font40 = pygame.font.SysFont("mongolianbaiti", 40)
+        self.font80 = pygame.font.SysFont("mongolianbaiti", 80)
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), FULLSCREEN)
         pygame.display.set_caption("Hyperball")
         self.clock = pygame.time.Clock()
@@ -91,7 +93,46 @@ class HyperBall():
         pygame.mouse.set_visible(False)
         scoretextone = self.font40.render("Player One Score: {}".format(self.playeronescore), 1, (250,0,0))
         self.scorelength = scoretextone.get_width()
-            
+
+    #initializes when ran from the menu
+    def __init__(self, screen):
+        self.screen = screen
+        self.WIDTH = 1366
+        self.HEIGHT = 768
+        self.speed = 7
+        self.font40 = pygame.font.SysFont("mongolianbaiti", 40)
+        self.font80 = pygame.font.SysFont("mongolianbaiti", 80)
+        pygame.display.set_caption("Hyperball")
+        self.clock = pygame.time.Clock()
+        self.playeronescore = 0
+        self.playertwoscore = 0
+        self.count = 0
+        self.alt = False
+        self.gameended = False
+        if hasattr(sys, '_MEIPASS'):
+            locationbackslash = sys._MEIPASS + "/"
+            self.location = locationbackslash.replace("\\","/")
+        else:
+            self.location = ""
+        self.backgroundimg = pygame.image.load(self.location + "background.png").convert()
+        self.background = self.backgroundimg.get_rect()
+        self.playeroneimg = pygame.image.load(self.location + "playerone.png")
+        self.playerone = self.playeroneimg.get_rect()
+        self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
+        self.playertwoimg = pygame.image.load(self.location + "playertwo.png")
+        self.playertwo = self.playertwoimg.get_rect()
+        self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
+        self.players = [self.playerone, self.playertwo]
+        self.obstructionimg = pygame.image.load(self.location + "obstruction.png").convert()
+        self.obstructions = self.createObstructions(50)
+        self.pointimg = pygame.image.load(self.location + "point.png").convert()
+        self.points = self.createRecs("point", 42, [self.players, self.obstructions])
+        self.extrapointimg = pygame.image.load(self.location + "extrapoint.png").convert()
+        self.extrapoints = self.createRecs("extrapoint", 6, [self.players, self.obstructions, self.points])
+        self.TOTALSCORE = len(self.points) + len(self.extrapoints) * 3
+        scoretextone = self.font40.render("Player One Score: {}".format(self.playeronescore), 1, (250,0,0))
+        self.scorelength = scoretextone.get_width()
+        
     #returns which sprite a player would hit if it moved
     def checkMovement(self, player, recs):    
         i = 0
@@ -240,6 +281,13 @@ class HyperBall():
         if keys[K_r]:
             self.restart()
 
+    def externalUpdate(self):
+        self.checkExit()
+        self.checkKeys()
+        self.awardPoints()
+        self.clock.tick(60)
+        self.count+= 1
+        
     #update function runs the game, calls all of the methods
     def update(self):
         self.checkExit()
@@ -250,6 +298,7 @@ class HyperBall():
         self.draw()
         pygame.display.flip()
         self.count += 1
+        
 #game instantiation and loop
 if __name__ == "__main__":
    # runs if it isn't ran from import

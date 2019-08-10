@@ -71,31 +71,14 @@ class HyperBall(ConnectionListener):
             templist.append(Rect(info["left"],info["top"],info["width"],info["height"]))
         return templist
 
-    def prepare(self):
-        prepareseconds = 3
+    def initPrepare(self):
+        self.prepareseconds = 3
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
         self.playertwo.center = (self.WIDTH * 2/3,self.HEIGHT/2)
         self.count = 0
-        firsttime = True
+        self.firsttime = True
         self.movementlock = True
-        while(self.count<prepareseconds*self.TICKRATE):
-            connection.Pump()
-            self.Pump()
-            self.checkExit()
-            self.clock.tick(self.TICKRATE)
-            self.screen.fill(0)
-            playernumbertext = self.font80.render("You are player {}".format(self.player+1), 1, (255,128,255))
-            countdowntext = self.font80.render("Starting in {}".format(round(prepareseconds-self.count/self.TICKRATE,1)),1,(255,128,255))
-            self.draw()
-            self.screen.blit(playernumbertext,(self.WIDTH/2-playernumbertext.get_width()/2,self.HEIGHT/2-playernumbertext.get_height()/2-40))
-            self.screen.blit(countdowntext, (self.WIDTH/2-countdowntext.get_width()/2,self.HEIGHT/2-countdowntext.get_height()/2+40))
-            pygame.display.flip()
-            if firsttime:
-                sleep(.5)
-                firsttime=False
-            self.count += 1
-        self.movementlock = False
-        self.count=0
+        self.gamestate = "preparing"
         
     #automatically runs when the class is instantiated, sets up the entire game
     def __init__(self):
@@ -108,9 +91,11 @@ class HyperBall(ConnectionListener):
         self.WIDTH = 1366
         self.HEIGHT = 768
         self.speed = 7
-        self.font30 = pygame.font.SysFont("Sans", 30)
-        self.font40 = pygame.font.SysFont("Sans", 40)
-        self.font80 = pygame.font.SysFont("Sans", 80)
+        #bell mongolianbaiti
+        font = "mongolianbaiti"
+        self.font30 = pygame.font.SysFont(font, 30)
+        self.font40 = pygame.font.SysFont(font, 40)
+        self.font80 = pygame.font.SysFont(font, 80)
         #these settings get used in the creation of the screen and improve performance
         settings = FULLSCREEN | NOFRAME #| DOUBLEBUF | HWSURFACE
         self.screen = pygame.display.set_mode((self.WIDTH,self.HEIGHT), settings)
@@ -125,7 +110,7 @@ class HyperBall(ConnectionListener):
         self.playeronescore = 0
         self.playertwoscore = 0
         self.count = 0
-        self.inhibitor = -16
+        self.inhibitor = -26
         self.exitnext = False
         self.escapenext = False
         self.alt = False
@@ -172,6 +157,7 @@ class HyperBall(ConnectionListener):
         self.moveingdown = False
         self.moveingleft = False
         self.moveingright = False
+        self.gameended = False
         self.connectionstate = "connecting"
         self.Connect((host,port))
         self.pump = True
@@ -272,7 +258,7 @@ class HyperBall(ConnectionListener):
         self.screen.blit(scoretextone, (self.WIDTH * 1/3 - self.scorelength/2,0))
         self.screen.blit(scoretexttwo, (self.WIDTH * 2/3 - self.scorelength/2,0))
         if(self.running == False):
-            disconnectedtext = self.font40.render("The other player has disconnected, press Escape to leave.", 1, (0,255,255))
+            disconnectedtext = self.font40.render("The other player has disconnected, press escape to leave.", 1, (0,255,255))
             self.screen.blit(disconnectedtext,(self.WIDTH/2-disconnectedtext.get_width()/2,self.HEIGHT/3-disconnectedtext.get_height()/2))
         if(self.gameended == True):
             if(self.playeronescore>self.playertwoscore):
@@ -315,12 +301,19 @@ class HyperBall(ConnectionListener):
         elif self.connectionstate == "connected":
             waitingtext = self.font40.render("Waiting for another player to connect...", 1, (0,255,255))
             self.screen.blit(waitingtext,(self.WIDTH/2-waitingtext.get_width()/2,self.menu1.y/2-waitingtext.get_height()/2))
-        elif self.connectionstate == "empty":
+        elif self.connectionstate == "empty" and self.count<300:
             waitingtext = self.font40.render("You didn't type anything in you twat", 1, (0,255,255))
             self.screen.blit(waitingtext,(self.WIDTH/2-waitingtext.get_width()/2,self.menu1.y/2-waitingtext.get_height()/2))
         elif self.connectionstate == "failed" and self.count<300:
             waitingtext = self.font40.render("Connection failed you knob", 1, (0,255,255))
             self.screen.blit(waitingtext,(self.WIDTH/2-waitingtext.get_width()/2,self.menu1.y/2-waitingtext.get_height()/2))
+            
+    def prepareDraw(self):
+        self.draw()
+        playernumbertext = self.font80.render("You are player {}".format(self.player+1), 1, (255,128,255))
+        countdowntext = self.font80.render("Starting in {}".format(round(self.prepareseconds-self.count/self.TICKRATE,1)),1,(255,128,255))
+        self.screen.blit(playernumbertext,(self.WIDTH/2-playernumbertext.get_width()/2,self.HEIGHT/2-playernumbertext.get_height()/2-40))
+        self.screen.blit(countdowntext, (self.WIDTH/2-countdowntext.get_width()/2,self.HEIGHT/2-countdowntext.get_height()/2+40))
             
     #exits on alt-f4 and on close
     def checkExit(self):
@@ -344,7 +337,7 @@ class HyperBall(ConnectionListener):
                     if(self.connectionstate == "connected"):
                         connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                     self.exitnext = True
-                if event.key == K_ESCAPE:
+                if event.key == K_ESCAPE and self.gamestate != "mainmenu":
                     if(self.connectionstate == "connected"):
                         connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
                     self.escapenext = True
@@ -398,19 +391,18 @@ class HyperBall(ConnectionListener):
             
     def menuCheckKeys(self):
         keys = pygame.key.get_pressed()
-        if (keys[K_UP] or keys[K_w]) and (self.inhibitor<self.count-15):
+        if (keys[K_UP] or keys[K_w]) and (self.inhibitor<self.count-25):
             self.selected += 1
             self.inhibitor = self.count
-        if (keys[K_DOWN] or keys[K_s]) and (self.inhibitor<self.count-15):
+        if (keys[K_DOWN] or keys[K_s]) and (self.inhibitor<self.count-25):
             self.selected -= 1
             self.inhibitor = self.count
         if keys[K_RETURN]:
             if self.selected % 2 == 0:
                 self.gamestate = "multiplayermenu"
-                #self.initMultiplayer(address, 31425)
             elif self.selected % 2 == 1:
                 self.selected = 0
-                self.spgame = hyperballsingle.HyperBall()
+                self.spgame = hyperballsingle.HyperBall(self.screen)
                 self.gamestate = "singleplayer"
                 
     def getInput(self):
@@ -444,10 +436,11 @@ class HyperBall(ConnectionListener):
                         pygame.display.flip()
                         self.initMultiplayer(self.address, 31425)
                     elif not self.address and self.connectionstate!="connected":
+                        self.count=0
+                        self.inhibitor=-26
                         self.connectionstate = "empty"
                 elif event.key == K_BACKSPACE:
                     self.address = self.address[:-1]
-                    self.count = 0
                 else:
                     self.address += event.unicode
                     self.address = self.address[:15]
@@ -457,45 +450,63 @@ class HyperBall(ConnectionListener):
                 if event.key == K_LCTRL or event.key == K_RCTRL:
                     self.ctrl = False
 
-                    
+    def mainmenu(self):
+        self.checkExit()
+        self.menuCheckKeys()
+        self.clock.tick(self.TICKRATE)
+        self.screen.fill(0)
+        self.menuDraw()
+        self.connectionTextDraw()
+        pygame.display.flip() 
+
+    def multiplayermenu(self):
+        self.getInput()
+        self.clock.tick(self.TICKRATE)
+        self.screen.fill(0)
+        self.multiplayerMenuDraw()
+        self.connectionTextDraw()
+        pygame.display.flip()
+
+    def multiplayer(self):
+        self.checkExit()
+        if(self.movementlock == False):
+            self.checkKeys()
+        self.awardPoints()
+        self.clock.tick(self.TICKRATE)
+        self.screen.fill(0)
+        self.draw()
+        pygame.display.flip()
+
+    def preparing(self):
+        self.checkExit()
+        self.clock.tick(self.TICKRATE)
+        self.screen.fill(0)
+        self.prepareDraw()
+        pygame.display.flip()
+        if self.firsttime:
+            sleep(.5)
+            self.firsttime=False
+        if self.count>=self.prepareseconds*self.TICKRATE:
+            self.movementlock = False
+            self.count=0
+            self.gamestate = "multiplayer"
+
+    def singleplayer(self):
+        self.spgame.externalUpdate()
+        self.screen.fill(0)
+        self.spgame.draw()
+        self.connectionTextDraw()
+        pygame.display.flip()
+        if pygame.key.get_pressed()[K_ESCAPE]:
+            self.gamestate = "mainmenu"
+            
     #update function runs the game, calls all of the neccesary methods
     def update(self):
         if self.pump:
             self.Pump()
             connection.Pump()
-        if self.gamestate == "mainmenu":
-            self.checkExit()
-            self.menuCheckKeys()
-            self.clock.tick(self.TICKRATE)
-            self.screen.fill(0)
-            self.menuDraw()
-            self.connectionTextDraw()
-            pygame.display.flip()
-            self.count += 1
-        elif self.gamestate == "multiplayermenu":
-            self.getInput()
-            self.clock.tick(self.TICKRATE)
-            self.screen.fill(0)
-            self.multiplayerMenuDraw()
-            self.connectionTextDraw()
-            pygame.display.flip()
-            self.count+=1
-        elif self.gamestate == "multiplayer":
-            self.checkExit()
-            if(self.movementlock == False):
-                self.checkKeys()
-            self.awardPoints()
-            self.clock.tick(self.TICKRATE)
-            self.screen.fill(0)
-            self.draw()
-            pygame.display.flip()
-            self.count += 1
-        elif self.gamestate == "singleplayer":
-            self.spgame.update()
-            self.connectionTextDraw()
-            pygame.display.flip()
-            if pygame.key.get_pressed()[K_ESCAPE]:
-                self.gamestate = "mainmenu"
+        getattr(self, self.gamestate)()
+        self.count+=1
 
     def Network_connected(self,data):
         self.connectionstate = "connected"
@@ -529,9 +540,8 @@ class HyperBall(ConnectionListener):
     def Network_start(self, data):
         #Sets the games to start at the same time
         self.running = True
-        self.gamestate = "multiplayer"
         pygame.display.set_caption("Hyperball Game {} Player {}".format(self.gameID+1, self.player+1))
-        self.prepare()
+        self.initPrepare()
         
     #Create a function to update a player based on a message from the server
     def Network_move(self, data):
@@ -578,14 +588,14 @@ class HyperBall(ConnectionListener):
 
     #Is sent to both clients at the same time so the games are synchronized on start
     def Network_prepare(self, data):
-        self.prepare()
+        self.initPrepare()
 
     def Network_exit(self, data):
         self.running = False
         
     def Network_error(self, data):
         self.count = 0
-        self.inhibitor = -16
+        self.inhibitor = -26
         self.connectionstate = "failed"
         
 #game instantiation and loop
