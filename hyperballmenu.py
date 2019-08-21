@@ -93,6 +93,7 @@ class HyperBall(ConnectionListener):
         self.speed = 7
         #bell mongolianbaiti
         font = "mongolianbaiti"
+        self.font20 = pygame.font.SysFont(font, 20)
         self.font30 = pygame.font.SysFont(font, 30)
         self.font40 = pygame.font.SysFont(font, 40)
         self.font80 = pygame.font.SysFont(font, 80)
@@ -115,8 +116,9 @@ class HyperBall(ConnectionListener):
         self.escapenext = False
         self.alt = False
         self.ctrl = False
-        self.gameended = False
         self.movementlock = False
+        self.playeronecolor = (0,255,255)
+        self.playertwocolor = (255,0,0)
         if hasattr(sys, '_MEIPASS'):
             locationbackslash = sys._MEIPASS + "/"
             self.location = locationbackslash.replace("\\","/")
@@ -158,6 +160,9 @@ class HyperBall(ConnectionListener):
         self.moveingleft = False
         self.moveingright = False
         self.gameended = False
+        self.chatting = False
+        self.messages = []
+        self.message = ""
         self.connectionstate = "connecting"
         self.Connect((host,port))
         self.pump = True
@@ -230,6 +235,7 @@ class HyperBall(ConnectionListener):
 
     #restarts the game        
     def restart(self):
+        self.movementlock = True
         self.gameended = False
         self.playerone.center = (self.WIDTH/3,self.HEIGHT/2)
         self.playertwo.center = (self.WIDTH*2/3,self.HEIGHT/2)
@@ -253,24 +259,43 @@ class HyperBall(ConnectionListener):
             self.screen.blit(self.extrapointimg, extrapoint)
         fps = self.font40.render(str(int(self.clock.get_fps())), 1, (255,255,255))
         self.screen.blit(fps,(0,0))
-        scoretextone = self.font40.render("Player One Score: {}".format(self.playeronescore), 1, (250,0,0))
-        scoretexttwo = self.font40.render("Player Two Score: {}".format(self.playertwoscore), 1, (250,0,0))
+        scoretextone = self.font40.render("Player One Score: {}".format(self.playeronescore), 1, self.playeronecolor)
+        scoretexttwo = self.font40.render("Player Two Score: {}".format(self.playertwoscore), 1, self.playertwocolor)
         self.screen.blit(scoretextone, (self.WIDTH * 1/3 - self.scorelength/2,0))
         self.screen.blit(scoretexttwo, (self.WIDTH * 2/3 - self.scorelength/2,0))
         if(self.running == False):
-            disconnectedtext = self.font40.render("The other player has disconnected, press escape to leave.", 1, (0,255,255))
+            disconnectedtext = self.font40.render("The other player has disconnected, press escape to leave.", 1, (255,255,255))
             self.screen.blit(disconnectedtext,(self.WIDTH/2-disconnectedtext.get_width()/2,self.HEIGHT/3-disconnectedtext.get_height()/2))
         if(self.gameended == True):
             if(self.playeronescore>self.playertwoscore):
-                finaltext = self.font80.render("Player One Wins!", 1, (255,255,255))
+                finaltext = self.font80.render("Player One Wins!", 1, self.playeronecolor)
                 self.screen.blit(finaltext,(self.WIDTH/2-finaltext.get_width()/2,self.HEIGHT/2-finaltext.get_height()/2))
             elif(self.playeronescore<self.playertwoscore):
-                finaltext = self.font80.render("Player Two Wins!", 1, (255,255,255))
+                finaltext = self.font80.render("Player Two Wins!", 1, self.playertwocolor)
                 self.screen.blit(finaltext,(self.WIDTH/2-finaltext.get_width()/2,self.HEIGHT/2-finaltext.get_height()/2))
             else:
                 finaltext = self.font80.render("The Game is a Tie!", 1, (255,255,255))
                 self.screen.blit(finaltext,(self.WIDTH/2-finaltext.get_width()/2,self.HEIGHT/2-finaltext.get_height()/2))
+        self.messageDraw()
 
+    def messageDraw(self):
+        i = 0
+        if len(self.messages)>5:
+            del self.messages[0]
+        for entry in self.messages:
+            if(entry["player"]==0):
+                text = self.font20.render("Player One: " + entry["message"],1,self.playeronecolor)
+            else:
+                text = self.font20.render("Player Two: " + entry["message"],1,self.playertwocolor)
+            self.screen.blit(text,(self.WIDTH*3/4,self.HEIGHT*3/4+i*25))
+            i += 1
+        if self.chatting:
+            if self.player == 0:
+                messagetext = self.font20.render("Player One: " + self.message,1,self.playeronecolor)
+            else:
+                messagetext = self.font20.render("Player Two: " + self.message,1,self.playertwocolor)
+            self.screen.blit(messagetext,(self.WIDTH*3/4,self.HEIGHT*3/4+i*25))
+                                          
     def menuDraw(self):
         self.screen.blit(self.backgroundimg, self.background)
         self.screen.blit(self.menuimg, self.menu1)        
@@ -314,9 +339,54 @@ class HyperBall(ConnectionListener):
         countdowntext = self.font80.render("Starting in {}".format(round(self.prepareseconds-self.count/self.TICKRATE,1)),1,(255,128,255))
         self.screen.blit(playernumbertext,(self.WIDTH/2-playernumbertext.get_width()/2,self.HEIGHT/2-playernumbertext.get_height()/2-40))
         self.screen.blit(countdowntext, (self.WIDTH/2-countdowntext.get_width()/2,self.HEIGHT/2-countdowntext.get_height()/2+40))
-            
-    #exits on alt-f4 and on close
-    def checkExit(self):
+
+    def getMultiplayerInput(self):
+        #Check if the user exited
+        if self.exitnext:
+            pygame.quit()
+            sys.exit()
+        if self.escapenext:
+            self.escapenext=False
+            self.gamestate = "mainmenu"
+            self.connectionstate = ""
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
+                self.exitnext = True
+            if event.type == KEYDOWN:
+                if event.key == K_LALT or event.key == K_RALT:
+                    self.alt = True
+                if event.key == K_F4 and self.alt:
+                    connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
+                    self.exitnext = True
+                if not self.chatting:
+                    if event.key == K_ESCAPE:
+                        connection.Send({"action":"exit","player":self.player,"gameID":self.gameID})
+                        self.escapenext = True
+                    elif event.key == K_r:
+                        self.restart()
+                        obstructionpackage = self.package(self.obstructions)
+                        pointpackage = self.package(self.points)
+                        extrapointpackage = self.package(self.extrapoints)
+                        connection.Send({"action":"restart","player":self.player,"gameID":self.gameID,"obstructions":obstructionpackage,"points":pointpackage,"extrapoints":extrapointpackage})
+                    elif event.key == K_y:
+                        self.chatting = True
+                else:
+                    if event.key == K_ESCAPE:
+                        self.chatting = False
+                    elif event.key == K_BACKSPACE:
+                        self.message = self.message[:-1]
+                    elif event.key == K_RETURN:
+                        self.messages.append({"message":self.message,"player":self.player})
+                        connection.Send({"action":"message","player":self.player,"gameID":self.gameID,"message":self.message})
+                        self.message = ""
+                    else:
+                        self.message += event.unicode
+            if event.type == KEYUP:
+                if event.key == K_LALT:
+                    self.alt = False 
+
+    def getInput(self):
         #Check if the user exited
         if self.exitnext:
             pygame.quit()
@@ -361,13 +431,8 @@ class HyperBall(ConnectionListener):
             self.moveLeft(self.players[self.player])
         if keys[K_d]:
             self.moveRight(self.players[self.player])
-        if keys[K_r] and self.count>30:
-            self.movementlock = True
-            self.restart()
-            obstructionpackage = self.package(self.obstructions)
-            pointpackage = self.package(self.points)
-            extrapointpackage = self.package(self.extrapoints)
-            connection.Send({"action":"restart","player":self.player,"gameID":self.gameID,"obstructions":obstructionpackage,"points":pointpackage,"extrapoints":extrapointpackage})     
+            
+    def extrapolate(self):
         #if(keys[K_w] or keys[K_s] or keys[K_a] or keys[K_d]):
         #must send every loop so the other client can tell whether information was missed
         connection.Send({"action":"update","x":self.players[self.player].x,"y":self.players[self.player].y,"player":self.player,"gameID":self.gameID})
@@ -405,7 +470,7 @@ class HyperBall(ConnectionListener):
                 self.spgame = hyperballsingle.HyperBall(self.screen)
                 self.gamestate = "singleplayer"
                 
-    def getInput(self):
+    def getMultiplayerMenuInput(self):
         if self.exitnext:
             pygame.quit()
             sys.exit()
@@ -451,16 +516,15 @@ class HyperBall(ConnectionListener):
                     self.ctrl = False
 
     def mainmenu(self):
-        self.checkExit()
+        self.getInput()
         self.menuCheckKeys()
         self.clock.tick(self.TICKRATE)
         self.screen.fill(0)
         self.menuDraw()
-        self.connectionTextDraw()
         pygame.display.flip() 
 
     def multiplayermenu(self):
-        self.getInput()
+        self.getMultiplayerMenuInput()
         self.clock.tick(self.TICKRATE)
         self.screen.fill(0)
         self.multiplayerMenuDraw()
@@ -468,9 +532,11 @@ class HyperBall(ConnectionListener):
         pygame.display.flip()
 
     def multiplayer(self):
-        self.checkExit()
-        if(self.movementlock == False):
+        self.getMultiplayerInput()
+        if(not self.movementlock and not self.chatting):
             self.checkKeys()
+        if(not self.movementlock):
+            self.extrapolate()
         self.awardPoints()
         self.clock.tick(self.TICKRATE)
         self.screen.fill(0)
@@ -478,7 +544,7 @@ class HyperBall(ConnectionListener):
         pygame.display.flip()
 
     def preparing(self):
-        self.checkExit()
+        self.getMultiplayerInput()
         self.clock.tick(self.TICKRATE)
         self.screen.fill(0)
         self.prepareDraw()
@@ -589,6 +655,9 @@ class HyperBall(ConnectionListener):
     #Is sent to both clients at the same time so the games are synchronized on start
     def Network_prepare(self, data):
         self.initPrepare()
+
+    def Network_message(self, data):
+        self.messages.append(data)
 
     def Network_exit(self, data):
         self.running = False

@@ -34,6 +34,9 @@ class ClientChannel(Channel):
     def Network_prepare(self, data):
         self._server.sendPrepare(data["gameID"])
 
+    def Network_message(self, data):
+        self._server.sendMessage(data["gameID"], data["player"], data["message"])
+
     def Network_exit(self, data):
         self._server.sendExit(data["player"], data["gameID"])
     
@@ -118,6 +121,13 @@ class GameServer(Server):
         g = self.games[gameID]
         for i in range(0, len(g.player_channels)):
             g.player_channels[i].Send({"action":"prepare"})
+
+    def sendMessage(self, gameID, player, message):
+        g = self.games[gameID]
+        for i in range(0, len(g.player_channels)):
+            if(i!=player):
+                g.player_channels[i].Send({"action":"message","player":player,"message":message})
+    
     def sendExit(self, player, gameID):
         #Get the game
         g = self.games[gameID]
